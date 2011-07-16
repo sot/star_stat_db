@@ -2,7 +2,7 @@ TASK = star_stat_db
 
 
 include /proj/sot/ska/include/Makefile.FLIGHT
-SHARE = update_star_stats_db.py agasc.py
+SHARE = update_star_stats.py agasc.py
 DATA = ok_missing.csv task_schedule.cfg
 
 

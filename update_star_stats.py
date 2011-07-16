@@ -168,6 +168,10 @@ def get_options():
     parser.add_option("--server",
                       default='db_base.db3',
                       help="DBI server (<filename>|sybase)")
+    parser.add_option("--user",
+                      help="DBI user (Ska.DBI default)")
+    parser.add_option("--database",
+                      help="DBI database (Ska.DBI default)")
     parser.add_option("--obsid",
                       help="obsid to process \"manually\"")
     parser.add_option("--dryrun",
@@ -846,7 +850,7 @@ def update_obi(obs, dbh, dryrun=False):
 def main():
 
     (opt,args) = get_options()
-    dbh = Ska.DBI.DBI(dbi=opt.dbi, server=opt.server, user='aca_test', database='aca_tstdb')
+
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     if opt.verbose == 2:
@@ -865,7 +869,9 @@ def main():
 
     nowdate=time.ctime()
     logger.info("---------- star stats DB update at %s ----------" % (nowdate))
-    
+    dbh = Ska.DBI.DBI(dbi=opt.dbi, server=opt.server, user=opt.user, database=opt.database)
+    logger.debug("connecting to db (dbi=%s, server=%s, user=%s, database=%s)" %
+                (dbh.dbi, dbh.server, dbh.user, dbh.database))
     okmissing = Ska.Table.read_ascii_table(opt.missing_list)
     logger.debug("Reading list of expected missing from %s" % opt.missing_list)
     okskip = set((x['obsid'], x['obi'], str(x['date'])) for x in okmissing)
