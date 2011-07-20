@@ -46,6 +46,9 @@ data_table = { 'gui' : 'trak_stats_data',
 warning_table = { 'gui': 'trak_slot_warnings',
                   'acq' : 'acq_stats_warnings' }
 
+anom_list = os.path.join(os.environ['SKA'],'data', 'star_stat_db', 'acq_anom_list.csv')
+#anom_list = 'acq_anom_list.csv'
+
 
 acq_cols = ['obsid',
             'obi',                         
@@ -263,7 +266,7 @@ def get_needed_obsids( requested_obsid=None, missing_set=set()):
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
         acq_list = sqlaca.fetchall(acq_q)
-        acq_set = set((x['obsid'], x['obi'], str(x['last_ap_date'])) for x in acq_list)
+        acq_set = set((x['obsid'], x['obi']) for x in acq_list)
 
         gui_q = """select %s, a.slot from mp_load_info as mp
                left outer join %s as a
@@ -275,17 +278,17 @@ def get_needed_obsids( requested_obsid=None, missing_set=set()):
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
         gui_list = sqlaca.fetchall(gui_q)
-        gui_set = set((x['obsid'], x['obi'], str(x['last_ap_date'])) for x in gui_list)
+        gui_set = set((x['obsid'], x['obi']) for x in gui_list)
 
         acq_up = acq_set - missing_set
         gui_up = gui_set - missing_set
 
         obsdata = []
-        for t_obsid, t_obi, t_date in acq_up:
+        for t_obsid, t_obi in acq_up:
             obsdata.append( acq_list[ (acq_list['obsid'] == t_obsid)
                                      & (acq_list['obi'] == t_obi)][0])
 
-        for t_obsid, t_obi, t_date in gui_up - acq_up:
+        for t_obsid, t_obi in gui_up - acq_up:
             obsdata.append( gui_list[ (gui_list['obsid'] == t_obsid)
                                      & (gui_list['obi'] == t_obi)][0])
 
@@ -525,7 +528,8 @@ def get_acq_data( mp_obs, stars ):
 
     # retrieve the transition to NPNT from the cmd_states database if the
     # observation is in the cmd_states era
-    min_cmd_time = sqlaca.fetchone("select min(time) as time from cmds")['time']
+    #min_cmd_time = sqlaca.fetchone("select min(time) as time from cmds")['time']
+    min_cmd_time = DateTime('2002:007:13:38:57.743').secs
     # the kalman_start and such are in all the lines of the stars recarray
     if stars[0].kalman_tstart > min_cmd_time:
         end_last_manvr_time = sqlaca.fetchone("""select max(tstart) as tstart from cmd_states
@@ -810,8 +814,10 @@ def get_acq_deltas( stars ):
             y_sum = 0
             z_sum = 0
             number = 0
-            for o_star in stars[(stars['type'] == 'BOT') | (stars['type'] == 'ACQ') ]:
-                if o_star.slot != star.slot and o_star.obc_id == 'ID':
+            ok_mask = (((stars['type'] == 'ACQ') | (stars['type'] == 'BOT'))
+                       & (stars['mag_obs'] < 13.9) & (stars['obc_id'] == 'ID'))
+            for o_star in stars[ok_mask]:
+                if o_star.slot != star.slot:
                     y_sum += o_star.yang_obs - o_star.yang
                     z_sum += o_star.zang_obs - o_star.zang
                     number += 1
@@ -830,10 +836,19 @@ def get_acq_deltas( stars ):
             star.d_mag = star.mag_obs - star.mag
             d_rad = (star.d_yang**2 + star.d_zang**2 )**.5
             if d_rad >= acq_anom_radius:
-		logger.error("Large Deviation from Expected ACQ Star Position in OBSID %d\n" % star.obsid
-                         + "\tExpected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang,star.zang)
-                         + "\tObserved (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang_obs, star.zang_obs))
+                anom_text = ("Large Deviation from Expected ACQ Star Position in OBSID %d\n" % star.obsid
+                             + "\tExpected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang,star.zang)
+                             + "\tObserved (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang_obs, star.zang_obs))
 
+                known_anoms = Ska.Table.read_ascii_table(anom_list)
+                logger.debug("Reading list of known acq anoms from %s" % anom_list)
+                anoms = set((x['obsid'], x['obi'], x['slot']) for x in known_anoms)  
+                curr_anom = (star['obsid'], star['obi'], star['slot'])
+                # if we've already seen it, don't "warn" and send email
+                if curr_anom in anoms:
+                    logger.info(anom_text)
+                else:
+                    logger.error(anom_text)
 
 
 def update_obi(obs, dbh, dryrun=False):
@@ -874,7 +889,7 @@ def main():
                 (dbh.dbi, dbh.server, dbh.user, dbh.database))
     okmissing = Ska.Table.read_ascii_table(opt.missing_list)
     logger.debug("Reading list of expected missing from %s" % opt.missing_list)
-    okskip = set((x['obsid'], x['obi'], str(x['date'])) for x in okmissing)
+    okskip = set((x['obsid'], x['obi']) for x in okmissing)
     obsdata = get_needed_obsids(requested_obsid=opt.obsid,
                                 missing_set=okskip)
 
@@ -889,7 +904,7 @@ def main():
                                                                   detail))
             
         except (TooOldError, WeirdObsidError) as detail:
-            okskip = okskip | set([(obs.obsid, obs.obi, obs.last_ap_date)])
+            okskip = okskip | set([(obs.obsid, obs.obi)])
             logger.debug("Skipping obsid %d obi %d: %s" % (obs.obsid,
                                                            obs.obi,
                                                            detail))
@@ -902,8 +917,8 @@ def main():
     if opt.update_missing:
         f = open(opt.missing_list, 'w')
         f.write("obsid,obi,date\n")
-        for obsid, obi, ap_date in okskip:
-            f.write("%s,%s,'%s'\n" % (obsid, obi,ap_date))
+        for obsid, obi in okskip:
+            f.write("%s,%s,'%s'\n" % (obsid, obi))
         f.close()
 
 
@@ -914,7 +929,6 @@ def main():
 if __name__ == '__main__':
     main()
 
-#
 
 
 
