@@ -1,6 +1,7 @@
+
 drop view guide_stats_view;
 create view guide_stats_view as
-select
+(select
 gsd.obsid as obsid,
 gsd.obi as obi,
 gsd.slot as slot,
@@ -42,7 +43,7 @@ sat_pix_samples,
 def_pix_samples,
 quad_bound_samples,
 ion_rad_samples,
-mult_stars_samples,
+mult_star_samples,
 sample_interval_secs,
 (not_tracking_samples*1.0/n_samples)*100  as percent_not_tracking,
 (obc_bad_status_samples*1.0/n_samples)*100 as percent_obc_bad_status,
@@ -52,17 +53,17 @@ sample_interval_secs,
 (def_pix_samples*1.0/n_samples)*100  as percent_def_pix,
 (quad_bound_samples*1.0/n_samples)*100  as percent_quad_bound,
 (ion_rad_samples*1.0/n_samples)*100  as percent_ion_rad,
-(mult_stars_samples*1.0/n_samples)*100  as percent_mult_stars,
+(mult_star_samples*1.0/n_samples)*100  as percent_mult_stars,
 gsd.ap_date as ap_date,
-gsd.tool_cvs_rev as tool_cvs_rev
+gsd.revision as tool_cvs_rev
 from
-guide_stats_data as gsd,
+trak_stats_data as gsd,
 starcheck_catalog as sc 
 where 
 gsd.obsid = sc.obsid
 and gsd.obi = sc.obi
 and gsd.slot = sc.slot
-and ( sc.type = 'BOT' or sc.type = 'GUI' or sc.type = 'FID' );
+and ( sc.type = 'BOT' or sc.type = 'GUI' or sc.type = 'FID' ));
 
 drop view guide_status_percent;
 create view guide_status_percent as
@@ -81,9 +82,9 @@ str(((sat_pix_samples*1.0/n_samples)*100),6,2) as sp,
 str(((def_pix_samples*1.0/n_samples)*100),6,2) as dp,
 str(((quad_bound_samples*1.0/n_samples)*100),6,2) as qb,
 str(((ion_rad_samples*1.0/n_samples)*100),6,2) as ir,
-str(((mult_stars_samples*1.0/n_samples)*100),6,2) as ms
+str(((mult_star_samples*1.0/n_samples)*100),6,2) as ms
 from
-guide_stats_data as gsd,
+trak_stats_data as gsd,
 starcheck_catalog as sc 
 where 
 gsd.obsid = sc.obsid
@@ -108,9 +109,9 @@ sat_pix_samples,
 def_pix_samples,
 quad_bound_samples,
 ion_rad_samples,
-mult_stars_samples
+mult_star_samples
 from
-guide_stats_data as gsd,
+trak_stats_data as gsd,
 starcheck_catalog as sc 
 where 
 gsd.obsid = sc.obsid
@@ -152,7 +153,7 @@ aoacmag_5th as mag_obs_5th,
 aoacmag_95th as mag_obs_95th,
 color
 from
-guide_stats_data as gsd,
+trak_stats_data as gsd,
 starcheck_catalog as sc 
 where 
 gsd.obsid = sc.obsid
