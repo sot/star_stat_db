@@ -39,7 +39,7 @@ logger.setLevel(logging.DEBUG)
 ID_DIST_LIMIT = 1.5
 acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
-revision = '3.0'
+revision = '3.1'
 
 data_table = { 'gui' : 'trak_stats_data',
                'acq' : 'acq_stats_data'}
@@ -532,9 +532,14 @@ def get_acq_data( mp_obs, stars ):
     min_cmd_time = DateTime('2002:007:13:38:57.743').secs
     # the kalman_start and such are in all the lines of the stars recarray
     if stars[0].kalman_tstart > min_cmd_time:
-        end_last_manvr_time = sqlaca.fetchone("""select max(tstart) as tstart from cmd_states
-                                                 where tstart < %f and pcad_mode = 'NPNT'"""
-                                              % (stars[0].kalman_tstart))['tstart']
+#        end_last_manvr_time = sqlaca.fetchone("""select max(tstart) as tstart from cmd_states
+#                                                 where tstart < %f and pcad_mode = 'NPNT'"""
+#                                              % (stars[0].kalman_tstart))['tstart']
+        end_last_manvr_time = sqlaca.fetchone("""select min(tstart) as tstart from aiprops
+                                                 where tstart < %f 
+                                                 and tstart > %f
+                                                 and pcad_mode = 'NPNT'""" 
+                                              % (stars[0].kalman_tstart, mp_obs['tstart']))['tstart']
     else:
         # if before cmd_states, dig around and find the maneuver summary to find
         # the end of the maneuver before the obsid begins
@@ -577,21 +582,29 @@ def get_acq_data( mp_obs, stars ):
     acq_match = aoacaseq.vals == 'AQXN'
 
     # find the guide transition time
-    gui_idx = np.flatnonzero(gui_match & obsid_match)
-    if len(gui_idx) < 2:
+    # indexes where going *to* GUID
+    change_to_guid = np.where(gui_match, 1, 0)[1:] - np.where(gui_match, 1, 0)[0:-1] == 1
+    # add a false at the beginning to get the length right
+    gui_trans = np.hstack([[False],change_to_guid])
+    gui_idx = np.flatnonzero(gui_trans & obsid_match)
+    if not len(gui_idx):
         raise ObsidError("Cannot determine guide transition time")
-    guide_time = aoacaseq.times[gui_idx[0]]
-    # and the first time after that
-    guide_time_plus = aoacaseq.times[gui_idx[1]]
-    # and the last acquisition time
-    acq_idx = np.flatnonzero(acq_match & obsid_match)
+    if len(gui_idx) > 1:
+        logger.debug("More than one guide transition")
+    for poss_gui_trans in gui_idx:
+        guide_time = aoacaseq.times[poss_gui_trans]
+        # and the first time after that
+        guide_time_plus = aoacaseq.times[poss_gui_trans + 1]
+        acq_time_match = aoacaseq.times < guide_time_plus
+        # and the last acquisition time before that
+        acq_idx = np.flatnonzero(acq_match & obsid_match & acq_time_match)
+        if len(acq_idx):
+            break
+
     if not len(acq_idx):
         raise ObsidError("Cannot determine last ACQ time" )
     acq_time = aoacaseq.times[max(acq_idx)]
     
-
-    if acq_time > guide_time:
-        raise ObsidError("acq time %f > guide time %f" % (acq_time, guide_time))
     logger.debug("ACQ time %s" % DateTime(acq_time).date)
 
     for star in stars:
@@ -775,6 +788,7 @@ def update_db( stars, warnings, dbh):
     if len(acqs):
         dbh.execute("delete from %s where obsid = %d and obi = %d" % (data_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
         dbh.execute("delete from %s where obsid = %d and obi = %d" % (warning_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
+        logger.info("Updating ACQ stars for obsid = %d" % acqs[0]['obsid'])
         logger.debug("Inserting acq stars")
         for acq in acqs:
             if len(warnings[acq['idx']]):
@@ -783,9 +797,10 @@ def update_db( stars, warnings, dbh):
             dbh.insert( acq, data_table['acq'] )
         logger.debug("acq inserts complete")
     trak = stars[(stars['type'] == 'FID') | (stars['type'] == 'GUI') | (stars['type'] == 'BOT')][gui_cols]
-    if len(acqs):
+    if len(trak):
         dbh.execute("delete from %s where obsid = %d and obi = %d" % (data_table['gui'], trak[0]['obsid'], trak[0]['obi']))
         dbh.execute("delete from %s where obsid = %d and obi = %d" % (warning_table['gui'], trak[0]['obsid'], trak[0]['obi']))
+        logger.info("Updating GUI stars for obsid = %d" % trak[0]['obsid'])
         logger.debug("Inserting gui stars")
         for star in trak:
             if len(warnings[star['idx']]):
