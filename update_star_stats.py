@@ -1,16 +1,11 @@
 #!/usr/bin/env python
 # Script to update guide star statistics
 
-import sys
+
 import os
-import glob
 import logging
 import logging.handlers
-from pprint import pformat
-import datetime
-import re
 import time
-import shutil
 import mx.DateTime
 
 import numpy as np
@@ -27,10 +22,9 @@ from pexpect import ExceptionPexpect
 
 
 sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', user='aca_read',
-                     numpy=True, database='aca' )
+                     numpy=True, database='aca')
 sqlocc = Ska.DBI.DBI(dbi='sybase', server='sqlocc', user='aca_ops',
                      numpy=True, database='axafocat')
-
 
 
 logger = logging.getLogger()
@@ -41,89 +35,90 @@ acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
 revision = '3.1'
 
-data_table = { 'gui' : 'trak_stats_data',
-               'acq' : 'acq_stats_data'}
-warning_table = { 'gui': 'trak_slot_warnings',
-                  'acq' : 'acq_stats_warnings' }
+data_table = {'gui': 'trak_stats_data',
+              'acq': 'acq_stats_data'}
+warning_table = {'gui': 'trak_slot_warnings',
+                 'acq': 'acq_stats_warnings'}
 
-anom_list = os.path.join(os.environ['SKA'],'data', 'star_stat_db', 'acq_anom_list.csv')
+anom_list = os.path.join(os.environ['SKA'],
+                         'data', 'star_stat_db', 'acq_anom_list.csv')
 #anom_list = 'acq_anom_list.csv'
 
 
 acq_cols = ['obsid',
-            'obi',                         
-            'tstart',                     
-            'tstop',                     
+            'obi',
+            'tstart',
+            'tstop',
             'slot',
             'cat_pos',
             'idx',
-            'type',                    
-            'agasc_id',               
-            'obc_id',                
-            'yang',                 
-            'zang',                
+            'type',
+            'agasc_id',
+            'obc_id',
+            'yang',
+            'zang',
             'mag',
             'color',
             'halfw',
-            'mag_obs',           
-            'yang_obs',         
-            'zang_obs',       
-            'd_mag',          
-            'd_yang',        
-            'd_zang',       
+            'mag_obs',
+            'yang_obs',
+            'zang_obs',
+            'd_mag',
+            'd_yang',
+            'd_zang',
             'y_offset',
             'z_offset',
-            'ap_date',     
+            'ap_date',
             'revision']
 
-gui_cols = ['obsid',		
-            'obi',		
-            'slot',		
-            'idx',	        
-            'cat_pos',	        
-            'id',              
-            'type',            
-            'color',           
-            'cyan_exp',        
-            'czan_exp',        
-            'mag_exp',         
+gui_cols = ['obsid',
+            'obi',
+            'slot',
+            'idx',
+            'cat_pos',
+            'id',
+            'type',
+            'color',
+            'cyan_exp',
+            'czan_exp',
+            'mag_exp',
             'kalman_datestart',
-            'kalman_datestop', 
-            'kalman_tstart',   
-            'kalman_tstop',    
-            'aoacyan_min',	
-            'aoacyan_mean',	
-            'aoacyan_max',	
-            'aoacyan_rms',	
-            'aoacyan_median',	
-            'aoacyan_5th',	
-            'aoacyan_95th',	
-            'aoaczan_min',	
-            'aoaczan_mean',	
-            'aoaczan_max',	
-            'aoaczan_rms',	
-            'aoaczan_median',	
-            'aoaczan_5th',	
-            'aoaczan_95th',	
-            'aoacmag_min',	
-            'aoacmag_mean',	
-            'aoacmag_max',	
-            'aoacmag_rms',	
-            'aoacmag_median',	
-            'aoacmag_5th',	
-            'aoacmag_95th',	
-            'n_samples',	
-            'not_tracking_samples',	
-            'bad_status_samples',	
-            'obc_bad_status_samples',  
-            'common_col_samples',	
-            'sat_pix_samples',		
-            'def_pix_samples',  	
-            'quad_bound_samples',	
-            'ion_rad_samples',   	
-            'mult_star_samples',	
-            'sample_interval_secs',	
-            'ap_date',     
+            'kalman_datestop',
+            'kalman_tstart',
+            'kalman_tstop',
+            'aoacyan_min',
+            'aoacyan_mean',
+            'aoacyan_max',
+            'aoacyan_rms',
+            'aoacyan_median',
+            'aoacyan_5th',
+            'aoacyan_95th',
+            'aoaczan_min',
+            'aoaczan_mean',
+            'aoaczan_max',
+            'aoaczan_rms',
+            'aoaczan_median',
+            'aoaczan_5th',
+            'aoaczan_95th',
+            'aoacmag_min',
+            'aoacmag_mean',
+            'aoacmag_max',
+            'aoacmag_rms',
+            'aoacmag_median',
+            'aoacmag_5th',
+            'aoacmag_95th',
+            'n_samples',
+            'not_tracking_samples',
+            'bad_status_samples',
+            'obc_bad_status_samples',
+            'common_col_samples',
+            'sat_pix_samples',
+            'def_pix_samples',
+            'quad_bound_samples',
+            'ion_rad_samples',
+            'mult_star_samples',
+            'sample_interval_secs',
+            'ap_date',
             'revision']
 
 star_columns = [x for x in (set(acq_cols) | set(gui_cols))]
@@ -134,31 +129,34 @@ class TooNewError(Exception):
     Special error for the case when the obsid is perhaps too new to have
     data in the starcheck or observations tables
     """
-    pass 
+    pass
+
+
 class TooOldError(Exception):
     """
     For observations before the observations table min tstart
     """
-    pass 
+    pass
 
 
 class WeirdObsidError(Exception):
     """
     For observations without star catalogs
     """
-    pass 
+    pass
+
 
 class MissingDataError(Exception):
     """
     Special error for the case when the obsid is missing from the
     starchec or observation database tables
     """
-    pass 
+    pass
+
 
 class ObsidError(Exception):
     """Class for obsid-related errors in this module"""
     pass
-
 
 
 def get_options():
@@ -187,17 +185,16 @@ def get_options():
                       default="ok_missing.csv")
     parser.add_option('--email',
                       default="jeanconn",
-                      help="email warning recipient") 
+                      help="email warning recipient")
     parser.add_option("-v", "--verbose",
                       type='int',
                       default=1,
-                      help="Verbosity (0=quiet, 1=normal, 2=debug)")    
-    (opt,args) = parser.parse_args()
+                      help="Verbosity (0=quiet, 1=normal, 2=debug)")
+    (opt, args) = parser.parse_args()
     return opt, args
 
 
-
-def get_obs_db( obsid, obi, tstart):
+def get_obs_db(obsid, obi, tstart):
     """
     Retrieve the observation table entry for the obsid/obi
 
@@ -206,20 +203,24 @@ def get_obs_db( obsid, obi, tstart):
     :rtype: recarray of database entry
     """
 
-    obs_query = """select obsid, obi_num as obi, kalman_datestart, kalman_datestop, kalman_tstart, kalman_tstop
+    obs_query = """select obsid, obi_num as obi,
+                   kalman_datestart, kalman_datestop,
+                   kalman_tstart, kalman_tstop
                    from observations
                    where obsid = %d and obi = %d""" % (obsid, obi)
     obs_array = sqlaca.fetchall(obs_query)
     if not len(obs_array):
-        in_obs_all = sqlaca.fetchall("""select * from observations_all where obsid = %d and obi = %d"""
+        in_obs_all = sqlaca.fetchall("""select * from observations_all
+                                        where obsid = %d and obi = %d"""
                                      % (obsid, obi))
         if len(in_obs_all):
             # this obsid doesn't have a kalman interval
-            raise WeirdObsidError("In observations_all but not observations table; no kalman")
+            raise WeirdObsidError(
+                "In observations_all but not observations table; no kalman")
         # bigger warning if this is old data and not in observations table
         minus7 = (DateTime(DateTime().mxDateTime
                            - mx.DateTime.DateTimeDeltaFromDays(7)))
-        if (tstart >= minus7.secs ):
+        if (tstart >= minus7.secs):
             raise TooNewError("Not yet in observations table")
         else:
             # min kalman_tstart in observations table is 63073857.260169
@@ -230,10 +231,8 @@ def get_obs_db( obsid, obi, tstart):
     return obsid
 
 
-
-def get_needed_obsids( requested_obsid=None, missing_set=set()):
+def get_needed_obsids(requested_obsid=None, missing_set=set()):
     """
-    
     Fetch the list of to-be-done obsids.  If requested_obsid is
     specified, the details from that obsid will be the only entries in
     the returned structure.
@@ -248,32 +247,35 @@ def get_needed_obsids( requested_obsid=None, missing_set=set()):
     fields = ['mp.obsid', 'mp.obi',
               'mp.tstart', 'mp.tstop', 'mp.mp_path',
               'mp.last_ap_date', 'mp.no_starcheck', 'mp.wrong_starcheck']
-    if (requested_obsid):        
+    if (requested_obsid):
         query = """SELECT %s from mp_load_info as mp where obsid = %d""" % (
             ','.join(fields), requested_obsid)
         obsdata = sqlaca.fetchall(query)
         if not len(obsdata):
-            logger.warn("get_needed_obsids(): found no record of %d in mp_load_info table"
-                     % requested_obsid)
+            logger.warn(
+                "get_needed_obsids(): no record of %d in mp_load_info table"
+                % requested_obsid)
     else:
-        acq_q = """select %s, a.slot from mp_load_info as mp
+        acq_q = ("""select %s, a.slot from mp_load_info as mp
                left outer join %s as a
                on mp.obsid = a.obsid
                and mp.obi = a.obi
                where a.slot is NULL
-               order by mp.tstart desc""" % ( ','.join(fields), data_table['acq'])
+               order by mp.tstart desc"""
+                 % (','.join(fields), data_table['acq']))
         #where a.slot = 4 or a.slot is NULL""" % (','.join(fields))
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
         acq_list = sqlaca.fetchall(acq_q)
         acq_set = set((x['obsid'], x['obi']) for x in acq_list)
 
-        gui_q = """select %s, a.slot from mp_load_info as mp
+        gui_q = ("""select %s, a.slot from mp_load_info as mp
                left outer join %s as a
                on mp.obsid = a.obsid
                and mp.obi = a.obi
                where a.slot is NULL
-               order by mp.tstart desc""" % ( ','.join(fields), data_table['gui'])
+               order by mp.tstart desc"""
+                 % (','.join(fields), data_table['gui']))
         #where a.slot = 4 or a.slot is NULL""" % (','.join(fields))
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
@@ -285,23 +287,20 @@ def get_needed_obsids( requested_obsid=None, missing_set=set()):
 
         obsdata = []
         for t_obsid, t_obi in acq_up:
-            obsdata.append( acq_list[ (acq_list['obsid'] == t_obsid)
+            obsdata.append(acq_list[(acq_list['obsid'] == t_obsid)
                                      & (acq_list['obi'] == t_obi)][0])
 
         for t_obsid, t_obi in gui_up - acq_up:
-            obsdata.append( gui_list[ (gui_list['obsid'] == t_obsid)
+            obsdata.append(gui_list[(gui_list['obsid'] == t_obsid)
                                      & (gui_list['obi'] == t_obi)][0])
-
 
     return obsdata
 
 
-
-
-def search_agasc( yang, zang, field_agasc, q_aca ):
+def search_agasc(yang, zang, field_agasc, q_aca):
     """
-    Search the retrieved agasc region for a star at the specified yang, zang, and
-    return the star if there is a match.
+    Search the retrieved agasc region for a star at the specified
+    yang, zang, and return the star if there is a match.
 
     :param yang:
     :param zang:
@@ -309,75 +308,77 @@ def search_agasc( yang, zang, field_agasc, q_aca ):
     :param q_aca: pointing quaternion for obsid
     :rtype: recarray of the matching star or None
     """
-    
+
     for agasc_star in field_agasc:
-        ( ra, dec ) = Ska.quatutil.yagzag2radec( yang*1.0/3600, zang*1.0/3600, q_aca )
+        ra, dec = Ska.quatutil.yagzag2radec(
+            yang * 1.0 / 3600,
+            zang * 1.0 / 3600,
+            q_aca)
         # 3600*(sph_dist in degrees) for arcseconds
-        dist = 3600*Ska.astro.sph_dist( agasc_star['RA_PMCORR'],
-                                        agasc_star['DEC_PMCORR'],
-                                   ra, dec )
+        dist = 3600 * Ska.astro.sph_dist(agasc_star['RA_PMCORR'],
+                                         agasc_star['DEC_PMCORR'],
+                                         ra, dec)
         if dist <= ID_DIST_LIMIT:
             return agasc_star
 
     return None
 
 
-
-def get_stars( obsdb_obs, mp_obs):
+def get_stars(obsdb_obs, mp_obs):
     """
     Retrieve guide star catalog details from starcheck_catalog database and
-    perform some basic checking (comparing stars to agasc and to archived stars)
-    Return a dictionary of dictionaries, with slots as the top level keys.
-    Each slot dictionary has a 'star' key and a 'warnings' key.  'star'
-    corresponds to a recarray that is intended to be the database entry for the star.
-    'warnings' corresponds to a list of warnings for the slot.
+    perform some basic checking (comparing stars to agasc and to archived
+    stars). Return a dictionary of dictionaries, with slots as the top level
+    keys. Each slot dictionary has a 'star' key and a 'warnings' key.  'star'
+    corresponds to a recarray that is intended to be the database entry for
+    the star. 'warnings' corresponds to a list of warnings for the slot.
 
     :param obs: basic obsid data as returned by get_needed_obsids()
     :rtype: dict
     """
-    
-    
+
     starcat = sqlaca.fetchall("""SELECT obsid,obi,slot,idx,id as agasc_id,
-                                   idnote,type,yang,zang,mag,halfw as halfwidth
-                                   from starcheck_catalog
-                                   where obsid = %d and obi = %d
-                                   order by idx""" % (obsdb_obs.obsid, obsdb_obs.obi))
+                                 idnote,type,yang,zang,mag,halfw as halfwidth
+                                 from starcheck_catalog
+                                 where obsid = %d and obi = %d
+                                 order by idx"""
+                              % (obsdb_obs.obsid, obsdb_obs.obi))
 
     soe_stars = sqlocc.fetchall("""SELECT slot,id,type,y_ang,z_ang from stars
                                    where obsid = %d
                                    and obi = %d order by slot"""
-                                % ( obsdb_obs.obsid, obsdb_obs.obi ))
+                                % (obsdb_obs.obsid, obsdb_obs.obi))
 
     if (len(starcat) and not len(soe_stars)):
-        logger.warn("No SOE stars in archive for obsid %d obi %d" % (obsdb_obs.obsid, obsdb_obs.obi))
-
+        logger.warn("No SOE stars in archive for obsid %d obi %d"
+                    % (obsdb_obs.obsid, obsdb_obs.obi))
 
     if not len(starcat):
         has_starcheck = sqlaca.fetchone("""SELECT obsid,obi from starcheck_obs
                                            where obsid = %d and obi = %d""" %
                                         (obsdb_obs.obsid, obsdb_obs.obi))
         if has_starcheck:
-            raise WeirdObsidError("In starcheck_obs but not starcheck_catalog; no catalog")
+            raise WeirdObsidError(
+                "In starcheck_obs but not starcheck_catalog; no catalog")
         if obsdb_obs.kalman_datestart < '2002:000:00:00:00.000':
             raise TooOldError("No starcheck_obs entry; old obsid")
         if obsdb_obs.obsid > 60000:
             raise WeirdObsidError("No catalog.  Expected weird obsid > 60000")
-        
-        raise ObsidError("No guide stars found in starcheck_catalog for obsid %d obi %d"
-                         % (obsdb_obs.obsid, obsdb_obs.obi))
-    
-    starcheck_warnings = sqlaca.fetchall("""SELECT * 
+
+        raise ObsidError(
+            "No guide stars found in starcheck_catalog for obsid %d obi %d"
+            % (obsdb_obs.obsid, obsdb_obs.obi))
+
+    starcheck_warnings = sqlaca.fetchall("""SELECT *
                                          from starcheck_warnings
                                          where obsid = %d and obi = %d """
-                                         % (obsdb_obs.obsid, obsdb_obs.obi ))
-    
+                                         % (obsdb_obs.obsid, obsdb_obs.obi))
 
     obs_info = sqlaca.fetchone("""SELECT * from starcheck_obs
                                   where obsid = %d and obi = %d"""
                                % (obsdb_obs.obsid, obsdb_obs.obi))
-    
 
-    stars = np.rec.fromrecords([[None]*len(star_columns)]*len(starcat),
+    stars = np.rec.fromrecords([[None] * len(star_columns)] * len(starcat),
                                names=(star_columns))
 
     warnings = {}
@@ -386,9 +387,9 @@ def get_stars( obsdb_obs, mp_obs):
         return stars
 
     from Quaternion import Quat
-    q_aca = Quat(( obs_info['point_ra'],
-                   obs_info['point_dec'],
-                   obs_info['point_roll'] ))
+    q_aca = Quat((obs_info['point_ra'],
+                  obs_info['point_dec'],
+                  obs_info['point_roll']))
     field_agasc = agasc(ra=obs_info['point_ra'],
                         dec=obs_info['point_dec'],
                         radius=1.5,
@@ -402,9 +403,8 @@ def get_stars( obsdb_obs, mp_obs):
         #        continue
 
         # populate a recarray for the star, leaving the items expected from
-        # telemetry empty 
-        star = stars[s['idx']-1]
-        
+        # telemetry empty
+        star = stars[s['idx'] - 1]
         star.obsid = obsdb_obs.obsid
         star.obi = obsdb_obs.obi
         star.slot = s.slot
@@ -418,19 +418,15 @@ def get_stars( obsdb_obs, mp_obs):
         star.yang = s.yang
         star.zang = s.zang
         star.mag = s.mag
-        star.agasc_id = s.agasc_id        
-        
+        star.agasc_id = s.agasc_id
         star.kalman_datestart = obsdb_obs.kalman_datestart
         star.kalman_datestop = obsdb_obs.kalman_datestop
         star.kalman_tstart = obsdb_obs.kalman_tstart
         star.kalman_tstop = obsdb_obs.kalman_tstop
-            
         star.cyan_exp = s.yang
         star.czan_exp = s.zang
         star.mag_exp = s.mag
-        star.id = s.agasc_id        
-
-
+        star.id = s.agasc_id
         star_warnings = []
         # reduced operations if this is a FID
         # (the storage operations are duplicated in the code)
@@ -441,7 +437,6 @@ def get_stars( obsdb_obs, mp_obs):
         if s['agasc_id'] is None:
             star_warnings.append("Missing AGASC id in starcheck_catalog")
 
-
         # for stars table 'type' field filtering
         soe_type = 1
         # increment the acquisition star catalog position
@@ -451,35 +446,36 @@ def get_stars( obsdb_obs, mp_obs):
             soe_type = 0
             acq_cat_pos += 1
 
-
         if len(soe_stars) == 0:
             star_warnings.append("SOE stars table has no entry for slot")
         else:
-            soe_match = soe_stars[(soe_stars.slot == star.slot) & (soe_stars.type == soe_type)]
+            soe_match = soe_stars[(soe_stars.slot == star.slot)
+                                  & (soe_stars.type == soe_type)]
             if len(soe_match):
                 # if there is a official entry for the star and it has
                 # an agasc id, do they match?
                 if s['agasc_id'] is not None:
-                    if ( soe_match['id'][0] != s['agasc_id']):
+                    if (soe_match['id'][0] != s['agasc_id']):
                         star_warnings.append("SOE id %d != Starcheck id %d" %
                                              (soe_match['id'][0],
                                               s['agasc_id']))
             else:
                 star_warnings.append("SOE stars table has no entry for slot")
 
-
         # AGASC search
         agasc_match = 0
         # if the star that is in the starcheck catalog exists in the field
         if s['agasc_id'] and any(field_agasc['AGASC_ID'] == s['agasc_id']):
-            agasc_star = field_agasc[field_agasc['AGASC_ID'] == s['agasc_id']][0]
+            agasc_star = field_agasc[
+                field_agasc['AGASC_ID'] == s['agasc_id']][0]
             # does it have the same position as the starcheck entry?
-            (star_ra, star_dec) = Ska.quatutil.yagzag2radec(
-                s['yang']*1.0/3600,
-                s['zang']*1.0/3600, q_aca )
-            radial_dist = 3600*Ska.astro.sph_dist( star_ra, star_dec,
-                                                   agasc_star['RA_PMCORR'],
-                                                   agasc_star['DEC_PMCORR'] )
+            star_ra, star_dec = Ska.quatutil.yagzag2radec(
+                s['yang'] * 1.0 / 3600,
+                s['zang'] * 1.0 / 3600,
+                q_aca)
+            radial_dist = 3600 * Ska.astro.sph_dist(star_ra, star_dec,
+                                                    agasc_star['RA_PMCORR'],
+                                                    agasc_star['DEC_PMCORR'])
             if radial_dist < ID_DIST_LIMIT:
                 agasc_match = 1
                 star.mag = agasc_star['MAG_ACA']
@@ -487,17 +483,22 @@ def get_stars( obsdb_obs, mp_obs):
                 star.color = agasc_star['COLOR1']
             else:
                 star_warnings.append(
-                    "Starcheck ID not consistent with AGASC position (off by %s arcsec)"
+                    "Starcheck ID not consistent with AGASC"
+                    " position (off by %s arcsec)"
                     % radial_dist)
 
         # if we have no entry or starcheck doesn't match expectations
-        if not agasc_match: 
-            agasc_star = search_agasc( star.cyan_exp, star.czan_exp, field_agasc, q_aca )
+        if not agasc_match:
+            agasc_star = search_agasc(star.cyan_exp,
+                                      star.czan_exp,
+                                      field_agasc,
+                                      q_aca)
             if agasc_star:
                 if s['agasc_id'] is not None:
                     star_warnings.append(
-                        "Different AGASC star %s found at given yang, zang of starcheck star %s"
-                                         % ( agasc_star['AGASC_ID'], s['agasc_id']))
+                        "Different AGASC star %s found at "
+                        "given yang, zang of starcheck star %s"
+                        % (agasc_star['AGASC_ID'], s['agasc_id']))
                 star.mag_exp = agasc_star['MAG_ACA']
                 star.mag = agasc_star['MAG_ACA']
                 star.agasc_id = agasc_star['AGASC_ID']
@@ -509,17 +510,17 @@ def get_stars( obsdb_obs, mp_obs):
 
         for warning in starcheck_warnings:
             if warning.idx == star.idx:
-                star_warnings.append( warning.warning )
+                star_warnings.append(warning.warning)
 
         warnings[star.idx] = star_warnings
 
     return (stars, warnings)
 
 
-def get_acq_data( mp_obs, stars ):
+def get_acq_data(mp_obs, stars):
     """
-    For a given observation, retrieve the acquisition telemetry and store in the previously
-    constructed star slot recarrays.
+    For a given observation, retrieve the acquisition telemetry
+    and store in the previously constructed star slot recarrays.
 
     :param obs: recarray as retrieved from get_needed_obsids()
     :param obs_db: recarry as retrieved from get_obs_db()
@@ -528,64 +529,71 @@ def get_acq_data( mp_obs, stars ):
 
     # retrieve the transition to NPNT from the cmd_states database if the
     # observation is in the cmd_states era
-    #min_cmd_time = sqlaca.fetchone("select min(time) as time from cmds")['time']
+    # min_cmd_time = sqlaca.fetchone(
+    # "select min(time) as time from cmds")['time']
     min_cmd_time = DateTime('2002:007:13:38:57.743').secs
     # the kalman_start and such are in all the lines of the stars recarray
     if stars[0].kalman_tstart > min_cmd_time:
-#        end_last_manvr_time = sqlaca.fetchone("""select max(tstart) as tstart from cmd_states
-#                                                 where tstart < %f and pcad_mode = 'NPNT'"""
-#                                              % (stars[0].kalman_tstart))['tstart']
-        end_last_manvr_time = sqlaca.fetchone("""select min(tstart) as tstart from aiprops
-                                                 where tstart < %f 
-                                                 and tstart > %f
-                                                 and pcad_mode = 'NPNT'""" 
-                                              % (stars[0].kalman_tstart, mp_obs['tstart']))['tstart']
+        end_last_manvr_time = sqlaca.fetchone(
+            """select min(tstart) as tstart from aiprops
+               where tstart < %f
+               and tstart > %f
+               and pcad_mode = 'NPNT'"""
+            % (stars[0].kalman_tstart, mp_obs['tstart']))['tstart']
     else:
-        # if before cmd_states, dig around and find the maneuver summary to find
-        # the end of the maneuver before the obsid begins
+        # if before cmd_states, dig around and find the maneuver summary
+        # to find the end of the maneuver before the obsid begins
         from glob import glob
-        mm_files = glob( os.path.join( mp_path, mp_obs.mp_path, 'mm*.sum'))
-        mm_files.extend( glob( os.path.join( mp_path + mp_obs.mp_path, 'mps', 'mm*.sum')))
-        mm_files.extend( glob( os.path.join( mp_path + mp_obs.mp_path, 'm???:????', 'mm*.sum')))
+        mm_files = glob(os.path.join(mp_path, mp_obs.mp_path, 'mm*.sum'))
+        mm_files.extend(glob(os.path.join(mp_path + mp_obs.mp_path,
+                                          'mps', 'mm*.sum')))
+        mm_files.extend(glob(os.path.join(mp_path + mp_obs.mp_path,
+                                          'm???:????', 'mm*.sum')))
         if not len(mm_files):
             raise ObsidError("No Maneuver Summary Found")
         import Ska.ParseCM
-        mm = Ska.ParseCM.read_mm( mm_files[0] )
+        mm = Ska.ParseCM.read_mm(mm_files[0])
         for m_entry in mm:
             if m_entry['tstop'] > stars[0].kalman_tstart:
                 break
             end_last_manvr_time = m_entry['tstop']
 
-    # the acq time should be sometime between the end of the last maneuver and the
-    # beginning of the kalman interval
+    # the acq time should be sometime between the end of the last
+    # maneuver and the beginning of the kalman interval
     pcad_tstart = end_last_manvr_time
     pcad_tstop = stars[0].kalman_tstart
 
-    acq_fields = [ field + '%s' % slot for field in ['AOACQID', 'AOACFCT', 
-                                                     'AOACMAG', 'AOACYAN', 'AOACZAN']
-                  for slot in range(0,8)]
+    acq_fields = [field + '%s' % slot for field in
+                  ['AOACQID', 'AOACFCT',
+                   'AOACMAG', 'AOACYAN', 'AOACZAN']
+                  for slot in range(0, 8)]
     fields = ['AOACASEQ', 'COBSRQID']
     fields.extend(acq_fields)
     telem = fetch.MSIDset(fields, pcad_tstart, pcad_tstop, filter_bad=True)
     aoacaseq = telem['AOACASEQ']
 
-    # the acquisition should also be labeled for the intended obsid, so check for that
+    # the acquisition should also be labeled for the intended obsid,
+    # so check for that
     cobsrqid = telem['COBSRQID']
     cobsid_match = np.flatnonzero(cobsrqid.vals == stars[0].obsid)
     if not len(cobsid_match):
-        raise ObsidError("obsid %d not found in cobsrqid telem in range" % stars[0].obsid )
+        raise ObsidError(
+            "obsid %d not found in cobsrqid telem in range"
+            % stars[0].obsid)
     min_pcad_obsid = cobsrqid.times[min(cobsid_match)]
     max_pcad_obsid = cobsrqid.times[max(cobsid_match)]
-    obsid_match = (aoacaseq.times >= min_pcad_obsid) & (aoacaseq.times <= max_pcad_obsid)
+    obsid_match = ((aoacaseq.times >= min_pcad_obsid)
+                   & (aoacaseq.times <= max_pcad_obsid))
 
     gui_match = aoacaseq.vals == 'GUID'
     acq_match = aoacaseq.vals == 'AQXN'
 
     # find the guide transition time
     # indexes where going *to* GUID
-    change_to_guid = np.where(gui_match, 1, 0)[1:] - np.where(gui_match, 1, 0)[0:-1] == 1
+    change_to_guid = (np.where(gui_match, 1, 0)[1:]
+                      - np.where(gui_match, 1, 0)[0:-1] == 1)
     # add a false at the beginning to get the length right
-    gui_trans = np.hstack([[False],change_to_guid])
+    gui_trans = np.hstack([[False], change_to_guid])
     gui_idx = np.flatnonzero(gui_trans & obsid_match)
     if not len(gui_idx):
         raise ObsidError("Cannot determine guide transition time")
@@ -602,9 +610,9 @@ def get_acq_data( mp_obs, stars ):
             break
 
     if not len(acq_idx):
-        raise ObsidError("Cannot determine last ACQ time" )
+        raise ObsidError("Cannot determine last ACQ time")
     acq_time = aoacaseq.times[max(acq_idx)]
-    
+
     logger.debug("ACQ time %s" % DateTime(acq_time).date)
 
     for star in stars:
@@ -615,10 +623,6 @@ def get_acq_data( mp_obs, stars ):
             obc_id_msid = telem['AOACQID%s' % star.cat_pos].vals[
                 (telem['AOACQID%s' % star.cat_pos].times >= guide_time)
                 & (telem['AOACQID%s' % star.cat_pos].times < guide_time_plus)]
-
-            track_id = telem['AOACFCT%s' % slot].vals[
-                (telem['AOACFCT%s' % slot].times >= guide_time)
-                & (telem['AOACFCT%s' % slot].times < guide_time_plus)]
 
             # There was logic here for adding the made-up NOTRAK obc status
             # but that seems to be unnecessary... a star is never obc_id 'ID'
@@ -644,10 +648,10 @@ def get_acq_data( mp_obs, stars ):
             star.zang_obs = aoaczan[0]
 
 
-def get_gui_data( stars ):
+def get_gui_data(stars):
     """
-    For a given observation, retrieve the acquisition telemetry and store in the previously
-    constructed star slot recarrays.
+    For a given observation, retrieve the acquisition telemetry
+    and store in the previously constructed star slot recarrays.
 
     :param obs: recarray as retrieved from get_needed_obsids()
     :param obs_db: recarry as retrieved from get_obs_db()
@@ -656,81 +660,84 @@ def get_gui_data( stars ):
     pcad_tstart = stars[0].kalman_tstart
     pcad_tstop = stars[0].kalman_tstop
 
-    gui_fields = [ field + '%s' % slot for field in [
-        'AOACICC', 'AOACIDP', 'AOACIIR', 'AOACIMS', 'AOACIQB', 'AOACISP',
-        'AOACQID', 'AOACFCT', 
-        'AOACMAG', 'AOACYAN', 'AOACZAN']
-                  for slot in range(0,8)]
+    gui_fields = [field + '%s' % slot for field in [
+            'AOACICC', 'AOACIDP', 'AOACIIR', 'AOACIMS',
+            'AOACIQB', 'AOACISP', 'AOACQID', 'AOACFCT',
+            'AOACMAG', 'AOACYAN', 'AOACZAN']
+                  for slot in range(0, 8)]
     fields = ['AOACASEQ', 'COBSRQID']
     fields.extend(gui_fields)
     telem = fetch.MSIDset(fields, pcad_tstart, pcad_tstop, filter_bad=True)
 
     aoacaseq = telem['AOACASEQ']
 
-    # the acquisition should also be labeled for the intended obsid, so check for that
+    # the acquisition should also be labeled for the intended obsid,
+    # so check for that
     cobsrqid = telem['COBSRQID']
     cobsid_match = np.flatnonzero(cobsrqid.vals == stars[0].obsid)
     if not len(cobsid_match):
-        raise ObsidError("obsid %d not found in cobsrqid telem in range" % stars[0].obsid )
+        raise ObsidError("obsid %d not found in cobsrqid telem in range"
+                         % stars[0].obsid)
     min_pcad_obsid = cobsrqid.times[min(cobsid_match)]
     max_pcad_obsid = cobsrqid.times[max(cobsid_match)]
-    obsid_match = (aoacaseq.times >= min_pcad_obsid) & (aoacaseq.times <= max_pcad_obsid)
+    obsid_match = ((aoacaseq.times >= min_pcad_obsid)
+                   & (aoacaseq.times <= max_pcad_obsid))
     for star in stars:
         if (star['type'] != 'ACQ'):
             slot = star['slot']
 
             refmsid = 'AOACASEQ'
-            star['n_samples'] = len(telem[ refmsid ].times[obsid_match])
+            star['n_samples'] = len(telem[refmsid].times[obsid_match])
             star['not_tracking_samples'] = len(np.flatnonzero(
                 telem['AOACFCT' + str(slot)].vals[obsid_match] != 'TRAK'))
 
-            for par in ['AOACMAG', 'AOACYAN', 'AOACZAN' ]:
-                stat_telem = telem[ par + str(slot)].vals[obsid_match]
-                star[par.lower() + '_min' ] = np.min(stat_telem)
-                star[par.lower() + '_max' ] = np.max(stat_telem)
+            for par in ['AOACMAG', 'AOACYAN', 'AOACZAN']:
+                stat_telem = telem[par + str(slot)].vals[obsid_match]
+                star[par.lower() + '_min'] = np.min(stat_telem)
+                star[par.lower() + '_max'] = np.max(stat_telem)
                 star[par.lower() + '_mean'] = np.mean(stat_telem)
                 star[par.lower() + '_median'] = np.median(stat_telem)
-                star[par.lower() + '_rms' ] = np.std(stat_telem)
-                star[par.lower() + '_5th' ] = scoreatpercentile(stat_telem, 5)
+                star[par.lower() + '_rms'] = np.std(stat_telem)
+                star[par.lower() + '_5th'] = scoreatpercentile(stat_telem, 5)
                 star[par.lower() + '_95th'] = scoreatpercentile(stat_telem, 95)
 
-
             stat_map = dict(common_col='AOACICC',
-                           def_pix='AOACIDP',
-                           mult_star='AOACIMS',
-                           ion_rad='AOACIIR',
-                           quad_bound='AOACIQB',
-                           sat_pix='AOACISP')
+                            def_pix='AOACIDP',
+                            mult_star='AOACIMS',
+                            ion_rad='AOACIIR',
+                            quad_bound='AOACIQB',
+                            sat_pix='AOACISP')
 
-            bad_stat = np.zeros(len(telem[ refmsid ].times[obsid_match]), dtype=bool)
-            obc_bad_stat = np.zeros(len(telem[ refmsid ].times[obsid_match]), dtype=bool)
-            obc_stat_fields =  [ 'common_col', 'def_pix', 'mult_star', 'ion_rad' ]
+            bad_stat = np.zeros(len(telem[refmsid].times[obsid_match]),
+                                dtype=bool)
+            obc_bad_stat = np.zeros(len(telem[refmsid].times[obsid_match]),
+                                    dtype=bool)
+            obc_stat_fields = ['common_col', 'def_pix',
+                               'mult_star', 'ion_rad']
             for imstat in stat_map.keys():
-                imstat_telem  = telem[ stat_map[imstat] + str(slot) ].vals[obsid_match]
-                star[imstat + '_samples'] = len(np.flatnonzero(imstat_telem != 'OK '))
-                bad_stat = bad_stat | (imstat_telem  != 'OK ')
+                slot_imstat = telem[stat_map[imstat] + str(slot)].vals
+                obsid_slot_imstat = slot_imstat[obsid_match]
+                star[imstat + '_samples'] = len(np.flatnonzero(
+                        obsid_slot_imstat != 'OK '))
+                bad_stat = bad_stat | (obsid_slot_imstat != 'OK ')
                 if imstat in obc_stat_fields:
-                    obc_bad_stat = obc_bad_stat | (imstat_telem != 'OK ')
+                    obc_bad_stat = obc_bad_stat | (obsid_slot_imstat != 'OK ')
 
             star['bad_status_samples'] = len(np.flatnonzero(bad_stat))
             star['obc_bad_status_samples'] = len(np.flatnonzero(obc_bad_stat))
-            dtime = telem[ refmsid ].times[obsid_match]
             star['sample_interval_secs'] = np.median(
-                telem[ refmsid ].times[obsid_match][1:]
-                - telem[ refmsid ].times[obsid_match][0:-1])
+                telem[refmsid].times[obsid_match][1:]
+                - telem[refmsid].times[obsid_match][0:-1])
 
             # warn on fids that are dropped or not tracked (more that 5%?)
             if star['type'] == 'FID':
-                nt_frac = star['not_tracking_samples'] * 1.0 / star['n_samples']
+                nt_frac = (star['not_tracking_samples'] * 1.0
+                           / star['n_samples'])
                 if (nt_frac > 0.05):
-                    logger.error("Fid in SLOT %d of OBSID %d OBI %d not tracking fraction = %.2f" %
-                                 ( slot,
-                                   star.obsid,
-                                   star.obi,
-                                   nt_frac ))
-
-
-
+                    logger.error(
+                        "Fid in SLOT %d of " % slot
+                        + "OBSID %d OBI %d " % (star.obsid, star.obi)
+                        + " not tracking fraction = %.2f" % nt_frac)
 
 
 def print_debug_table(stars, warnings):
@@ -746,24 +753,22 @@ def print_debug_table(stars, warnings):
         'aoacyan_mean': '% 4.2f',
         'aoaczan_mean': '% 4.2f',
         'color': '% 4.2f',
-        'yang' : '% 8.2f',
-        'zang' : '% 8.2f',
-        'mag_obs' : '% 4.2f',
-        'yang_obs' : '% 8.2f',
-        'zang_obs' : '% 8.2f',
-        'ap_date' : '%s',
-        'revision' : '%s',
-        'd_mag' : '% 4.2f',
-        'd_yang' : '% 8.2f',
-        'd_zang' : '% 8.2f',
-           }
-    
+        'yang': '% 8.2f',
+        'zang': '% 8.2f',
+        'mag_obs': '% 4.2f',
+        'yang_obs': '% 8.2f',
+        'zang_obs': '% 8.2f',
+        'ap_date': '%s',
+        'revision': '%s',
+        'd_mag': '% 4.2f',
+        'd_yang': '% 8.2f',
+        'd_zang': '% 8.2f',
+        }
 
-
-    #logger.debug('\t'.join(['%s' % field for field in [obs.obsid, obs.obi, obs.tstart, obs.tstop, obs.last_ap_date ]]))
-
-    #logger.debug("\t".join(star_columns))
-    fields = ['idx','slot','type', 'id', 'obc_id', 'mag', 'mag_obs', 'aoacmag_mean', 'yang', 'yang_obs', 'aoacyan_mean', 'zang', 'zang_obs', 'aoaczan_mean']
+    fields = ['idx', 'slot', 'type', 'id', 'obc_id',
+              'mag', 'mag_obs', 'aoacmag_mean',
+              'yang', 'yang_obs', 'aoacyan_mean',
+              'zang', 'zang_obs', 'aoaczan_mean']
     logger.debug("\t".join(fields))
     for star in stars:
         slot_line = []
@@ -779,52 +784,65 @@ def print_debug_table(stars, warnings):
         for warn in warnings[idx]:
                 logger.debug("idx: % 2d %s" % (idx, warn))
 
-def update_db( stars, warnings, dbh):
+
+def update_db(stars, warnings, dbh):
     """
     Delete guide stats entries for the given obsid and insert the new entries.
     """
 
-    acqs = stars[(stars['type'] == 'BOT') | (stars['type'] == 'ACQ') ][acq_cols]
+    acqs = stars[(stars['type'] == 'BOT')
+                 | (stars['type'] == 'ACQ')][acq_cols]
     if len(acqs):
-        dbh.execute("delete from %s where obsid = %d and obi = %d" % (data_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
-        dbh.execute("delete from %s where obsid = %d and obi = %d" % (warning_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
+        dbh.execute("delete from %s where obsid = %d and obi = %d"
+                    % (data_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
+        dbh.execute("delete from %s where obsid = %d and obi = %d"
+                    % (warning_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
         logger.info("Updating ACQ stars for obsid = %d" % acqs[0]['obsid'])
         logger.debug("Inserting acq stars")
         for acq in acqs:
             if len(warnings[acq['idx']]):
                 for warn in warnings[acq['idx']]:
-                    dbh.insert(dict(obsid=acq['obsid'],obi=acq['obi'],slot=acq['slot'],details=warn), warning_table['acq'])
-            dbh.insert( acq, data_table['acq'] )
+                    dbh.insert(dict(obsid=acq['obsid'],
+                                    obi=acq['obi'],
+                                    slot=acq['slot'],
+                                    details=warn), warning_table['acq'])
+            dbh.insert(acq, data_table['acq'])
         logger.debug("acq inserts complete")
-    trak = stars[(stars['type'] == 'FID') | (stars['type'] == 'GUI') | (stars['type'] == 'BOT')][gui_cols]
+    trak = stars[(stars['type'] == 'FID')
+                 | (stars['type'] == 'GUI')
+                 | (stars['type'] == 'BOT')][gui_cols]
     if len(trak):
-        dbh.execute("delete from %s where obsid = %d and obi = %d" % (data_table['gui'], trak[0]['obsid'], trak[0]['obi']))
-        dbh.execute("delete from %s where obsid = %d and obi = %d" % (warning_table['gui'], trak[0]['obsid'], trak[0]['obi']))
+        dbh.execute("delete from %s where obsid = %d and obi = %d"
+                    % (data_table['gui'], trak[0]['obsid'], trak[0]['obi']))
+        dbh.execute("delete from %s where obsid = %d and obi = %d"
+                    % (warning_table['gui'], trak[0]['obsid'], trak[0]['obi']))
         logger.info("Updating GUI stars for obsid = %d" % trak[0]['obsid'])
         logger.debug("Inserting gui stars")
         for star in trak:
             if len(warnings[star['idx']]):
                 for warn in warnings[star['idx']]:
-                    dbh.insert(dict(obsid=star['obsid'],obi=star['obi'],slot=star['slot'],warning=warn), warning_table['gui'])
-            dbh.insert( star, data_table['gui'] )
+                    dbh.insert(dict(obsid=star['obsid'],
+                                    obi=star['obi'],
+                                    slot=star['slot'],
+                                    warning=warn), warning_table['gui'])
+            dbh.insert(star, data_table['gui'])
         logger.debug("gui inserts complete")
 
-    
 
-def get_acq_deltas( stars ):
+def get_acq_deltas(stars):
     """
-    For the obsid, and the stars structure given, calculate the differences between
-    the observed and expected mag, yang, and zang.
+    For the obsid, and the stars structure given, calculate
+    the differences between the observed and expected mag, yang, and zang.
 
     :param obs: obs recarray from get_needed_obsids()
-    :param stars: stars structure created in get_acq_stars() and populated with telem from get_pcad_data()
-
+    :param stars: stars structure created in get_acq_stars() and
+    populated with telem from get_pcad_data()
     """
 
     for star in stars:
-        
         # if star has magnitude data, consider it 'tracked'
-        if ((star.mag_obs < 13.9) & ((star['type'] == 'BOT') | (star['type'] == 'ACQ'))):
+        if ((star.mag_obs < 13.9) &
+            ((star['type'] == 'BOT') | (star['type'] == 'ACQ'))):
             # calculate mean offset of all of the other tracked stars
             y_sum = 0
             z_sum = 0
@@ -836,28 +854,34 @@ def get_acq_deltas( stars ):
                     y_sum += o_star.yang_obs - o_star.yang
                     z_sum += o_star.zang_obs - o_star.zang
                     number += 1
-            # using the mean offset, calculated the differences in expected/observed
-            # positions
+
+            # using the mean offset, calculated the differences
+            # in expected/observed positions
             if number:
-                y_off = y_sum/number
-                z_off = z_sum/number
+                y_off = y_sum / number
+                z_off = z_sum / number
                 star.d_yang = star.yang_obs - (star.yang + y_off)
                 star.y_offset = y_off
                 star.d_zang = star.zang_obs - (star.zang + z_off)
                 star.z_offset = z_off
             else:
                 raise ObsidError("No stars to calculate mean offset")
-                
             star.d_mag = star.mag_obs - star.mag
-            d_rad = (star.d_yang**2 + star.d_zang**2 )**.5
+            d_rad = (star.d_yang ** 2 + star.d_zang ** 2) ** .5
             if d_rad >= acq_anom_radius:
-                anom_text = ("Large Deviation from Expected ACQ Star Position in OBSID %d\n" % star.obsid
-                             + "\tExpected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang,star.zang)
-                             + "\tObserved (Y-Pos,Z-Pos) = (%.1f, %.1f) \n" % (star.yang_obs, star.zang_obs))
+                anom_text = (
+                    "Large Deviation from Expected ACQ Star Position "
+                    " in OBSID %d\n" % star.obsid
+                    + "\tExpected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
+                    % (star.yang, star.zang)
+                    + "\tObserved (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
+                    % (star.yang_obs, star.zang_obs))
 
                 known_anoms = Ska.Table.read_ascii_table(anom_list)
-                logger.debug("Reading list of known acq anoms from %s" % anom_list)
-                anoms = set((x['obsid'], x['obi'], x['slot']) for x in known_anoms)  
+                logger.debug(
+                    "Reading list of known acq anoms from %s" % anom_list)
+                anoms = set((x['obsid'], x['obi'], x['slot'])
+                            for x in known_anoms)
                 curr_anom = (star['obsid'], star['obi'], star['slot'])
                 # if we've already seen it, don't "warn" and send email
                 if curr_anom in anoms:
@@ -865,16 +889,15 @@ def get_acq_deltas( stars ):
                 else:
                     logger.error(anom_text)
 
-
 def update_obi(obs, dbh, dryrun=False):
-    obs_db = get_obs_db( obs.obsid, obs.obi, obs.tstart )
-    stars, warnings = get_stars( obs_db, obs)
-    get_acq_data( obs, stars )
-    get_acq_deltas( stars )
-    get_gui_data( stars )
-    print_debug_table( stars, warnings )
+    obs_db = get_obs_db(obs.obsid, obs.obi, obs.tstart)
+    stars, warnings = get_stars(obs_db, obs)
+    get_acq_data(obs, stars)
+    get_acq_deltas(stars)
+    get_gui_data(stars)
+    print_debug_table(stars, warnings)
     if not dryrun:
-        update_db( stars, warnings, dbh=dbh)
+        update_db(stars, warnings, dbh=dbh)
 
 
 def main():
@@ -908,7 +931,6 @@ def main():
     obsdata = get_needed_obsids(requested_obsid=opt.obsid,
                                 missing_set=okskip)
 
-
     for obs in obsdata:
         logger.debug("Processing %d %d" % (obs.obsid, obs.obi))
         try:
@@ -917,7 +939,6 @@ def main():
             logger.debug("Skipping Too New obsid %d obi %d: %s" % (obs.obsid,
                                                                   obs.obi,
                                                                   detail))
-            
         except (TooOldError, WeirdObsidError) as detail:
             okskip = okskip | set([(obs.obsid, obs.obi)])
             logger.debug("Skipping obsid %d obi %d: %s" % (obs.obsid,
@@ -925,10 +946,11 @@ def main():
                                                            detail))
 
         except (MissingDataError, ObsidError, ExceptionPexpect) as detail:
-            logger.warn("Error processing %d:%d obidet date: '%s' : %s" % (obs.obsid,
-                                                                      obs.obi,
-                                                                      obs.last_ap_date,
-                                                                      detail))
+            logger.warn("Error processing %d:%d obidet date: '%s' : %s"
+                        % (obs.obsid,
+                           obs.obi,
+                           obs.last_ap_date,
+                           detail))
     if opt.update_missing:
         f = open(opt.missing_list, 'w')
         f.write("obsid,obi,date\n")
@@ -936,14 +958,9 @@ def main():
             f.write("%s,%s,'%s'\n" % (obsid, obi))
         f.close()
 
-
     if opt.email:
         logger.removeHandler(smtp_handler)
     logger.removeHandler(ch)
 
 if __name__ == '__main__':
     main()
-
-
-
-
