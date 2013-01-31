@@ -7,6 +7,8 @@ import logging
 import logging.handlers
 import time
 import mx.DateTime
+import smtplib
+from email.mime.text import MIMEText
 
 import numpy as np
 import Ska.DBI
@@ -739,7 +741,6 @@ def get_gui_data(stars):
                         + "OBSID %d OBI %d " % (star.obsid, star.obi)
                         + " not tracking fraction = %.2f" % nt_frac)
 
-
 def print_debug_table(stars, warnings):
 
     fmt = {
@@ -829,7 +830,17 @@ def update_db(stars, warnings, dbh):
         logger.debug("gui inserts complete")
 
 
-def get_acq_deltas(stars):
+def anom_email(obsid, obi, to_addr, message):
+    msg = MIMEText(message)
+    msg['Subject'] = 'Acq Anomaly: Obsid %d Obi %d' % (obsid, obi)
+    msg['From'] = 'aca@head.cfa.harvard.edu'
+    msg['To'] = to_addr
+    s = smtplib.SMTP('head.cfa.harvard.edu')
+    s.sendmail('aca@head.cfa.harvard.edu', [to_addr], msg.as_string())
+    s.quit()
+
+
+def get_acq_deltas(stars, email=None):
     """
     For the obsid, and the stars structure given, calculate
     the differences between the observed and expected mag, yang, and zang.
@@ -869,13 +880,12 @@ def get_acq_deltas(stars):
             star.d_mag = star.mag_obs - star.mag
             d_rad = (star.d_yang ** 2 + star.d_zang ** 2) ** .5
             if d_rad >= acq_anom_radius:
-                anom_text = (
-                    "Large Deviation from Expected ACQ Star Position "
-                    " in OBSID %d\n" % star.obsid
-                    + "\tExpected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
-                    % (star.yang, star.zang)
-                    + "\tObserved (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
-                    % (star.yang_obs, star.zang_obs))
+                anom_text = ("Large Deviation from Expected ACQ Star Position "
+                             + "in %d (obi %d)\n" % (star.obsid, star.obi)
+                             + "\tSlot %d Expected (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
+                             % (star.slot, star.yang, star.zang)
+                             + "\tSlot %d Observed (Y-Pos,Z-Pos) = (%.1f, %.1f) \n"
+                             % (star.slot, star.yang_obs, star.zang_obs))
 
                 known_anoms = Ska.Table.read_ascii_table(anom_list)
                 logger.debug(
@@ -887,13 +897,15 @@ def get_acq_deltas(stars):
                 if curr_anom in anoms:
                     logger.info(anom_text)
                 else:
-                    logger.error(anom_text)
+                    if email:
+                        anom_email(star.obsid, star.obi, email, anom_text)
 
-def update_obi(obs, dbh, dryrun=False):
+
+def update_obi(obs, dbh, dryrun=False, email=None):
     obs_db = get_obs_db(obs.obsid, obs.obi, obs.tstart)
     stars, warnings = get_stars(obs_db, obs)
     get_acq_data(obs, stars)
-    get_acq_deltas(stars)
+    get_acq_deltas(stars, email)
     get_gui_data(stars)
     print_debug_table(stars, warnings)
     if not dryrun:
@@ -911,14 +923,6 @@ def main():
     if opt.verbose == 0:
         ch.setLevel(logging.WARN)
     logger.addHandler(ch)
-    if opt.email:
-        # emails...
-        smtp_handler = logging.handlers.SMTPHandler('localhost',
-                                                    'aca@head.cfa.harvard.edu',
-                                                    '%s@head.cfa.harvard.edu' % opt.email,
-                                                    'star stats')
-        smtp_handler.setLevel(logging.ERROR)
-        logger.addHandler(smtp_handler)  
 
     nowdate=time.ctime()
     logger.info("---------- star stats DB update at %s ----------" % (nowdate))
@@ -934,7 +938,7 @@ def main():
     for obs in obsdata:
         logger.debug("Processing %d %d" % (obs.obsid, obs.obi))
         try:
-            update_obi(obs, dbh=dbh, dryrun=opt.dryrun)
+            update_obi(obs, dbh=dbh, dryrun=opt.dryrun, email=opt.email)
         except TooNewError as detail:
             logger.debug("Skipping Too New obsid %d obi %d: %s" % (obs.obsid,
                                                                   obs.obi,
@@ -958,8 +962,6 @@ def main():
             f.write("%s,%s,'%s'\n" % (obsid, obi))
         f.close()
 
-    if opt.email:
-        logger.removeHandler(smtp_handler)
     logger.removeHandler(ch)
 
 if __name__ == '__main__':
