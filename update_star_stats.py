@@ -326,7 +326,7 @@ def search_agasc(yang, zang, field_agasc, q_aca):
     return None
 
 
-def get_stars(obsdb_obs, mp_obs):
+def get_stars(obsdb_obs, mp_obs, dbi):
     """
     Retrieve guide star catalog details from starcheck_catalog database and
     perform some basic checking (comparing stars to agasc and to archived
@@ -412,7 +412,10 @@ def get_stars(obsdb_obs, mp_obs):
         star.slot = s.slot
         star.idx = s.idx
         star.type = s.type
-        star.ap_date = mp_obs.last_ap_date
+        if dbi == 'sqlite':
+            star.ap_date = str(mp_obs.last_ap_date)
+        else:
+            star.ap_date = mp_obs.last_ap_date
         star.revision = "%s" % revision
         star.tstart = mp_obs.tstart
         star.tstop = mp_obs.tstop
@@ -909,7 +912,7 @@ def get_acq_deltas(stars, email=None):
 
 def update_obi(obs, dbh, dryrun=False, email=None):
     obs_db = get_obs_db(obs.obsid, obs.obi, obs.tstart)
-    stars, warnings = get_stars(obs_db, obs)
+    stars, warnings = get_stars(obs_db, obs, dbh.dbi)
     get_acq_data(obs, stars)
     get_acq_deltas(stars, email)
     get_gui_data(stars, email)
@@ -928,10 +931,19 @@ def main():
         ch.setLevel(logging.DEBUG)
     if opt.verbose == 0:
         ch.setLevel(logging.WARN)
-    logger.addHandler(ch)
+    if not len(logger.handlers):
+        logger.addHandler(ch)
 
     nowdate=time.ctime()
     logger.info("---------- star stats DB update at %s ----------" % (nowdate))
+    # make a sqlite db if in that mode and one doesn't exist
+    if (opt.dbi == 'sqlite' and
+        (not os.path.exists(opt.server) or os.stat(opt.server).st_size == 0)):
+        logger.info("Creating db from create_tables.sqlite")
+        db_init_cmds = file("create_tables.sqlite").read()
+        db = Ska.DBI.DBI(dbi='sqlite', server=opt.server)
+        db.execute(db_init_cmds)
+        del db
     dbh = Ska.DBI.DBI(dbi=opt.dbi, server=opt.server, user=opt.user, database=opt.database)
     logger.debug("connecting to db (dbi=%s, server=%s, user=%s, database=%s)" %
                 (dbh.dbi, dbh.server, dbh.user, dbh.database))
