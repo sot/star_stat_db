@@ -35,7 +35,7 @@ logger.setLevel(logging.DEBUG)
 ID_DIST_LIMIT = 1.5
 acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
-revision = '3.1'
+revision = '3.2'
 
 data_table = {'gui': 'trak_stats_data',
               'acq': 'acq_stats_data'}
