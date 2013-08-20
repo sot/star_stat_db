@@ -650,7 +650,7 @@ def get_acq_data(mp_obs, stars):
             star.zang_obs = aoaczan[0]
 
 
-def get_gui_data(stars):
+def get_gui_data(stars, email=None):
     """
     For a given observation, retrieve the acquisition telemetry
     and store in the previously constructed star slot recarrays.
@@ -736,10 +736,15 @@ def get_gui_data(stars):
                 nt_frac = (star['not_tracking_samples'] * 1.0
                            / star['n_samples'])
                 if (nt_frac > 0.05):
-                    logger.error(
+                    warn = (
                         "Fid in SLOT %d of " % slot
                         + "OBSID %d OBI %d " % (star.obsid, star.obi)
                         + " not tracking fraction = %.2f" % nt_frac)
+                    logger.error(warn)
+                    anom_email(star.obsid, star.obi, to_addr=email, mesg=warn,
+                               subject='FID Trak < 95%%: Obsid %d Obi %d' % (
+                            star.obsid, star.obi))
+
 
 def print_debug_table(stars, warnings):
 
@@ -829,11 +834,10 @@ def update_db(stars, warnings, dbh):
             dbh.insert(star, data_table['gui'])
         logger.debug("gui inserts complete")
 
-
-def anom_email(obsid, obi, to_addr, message):
-    msg = MIMEText(message)
-    msg['Subject'] = 'Acq Anomaly: Obsid %d Obi %d' % (obsid, obi)
+def anom_email(obsid, obi, to_addr, mesg, subject):
+    msg = MIMEText(mesg)
     msg['From'] = 'aca@head.cfa.harvard.edu'
+    msg['Subject'] = subject
     msg['To'] = to_addr
     s = smtplib.SMTP('head.cfa.harvard.edu')
     s.sendmail('aca@head.cfa.harvard.edu', [to_addr], msg.as_string())
@@ -898,15 +902,17 @@ def get_acq_deltas(stars, email=None):
                     logger.info(anom_text)
                 else:
                     if email:
-                        anom_email(star.obsid, star.obi, email, anom_text)
-
+                        anom_email(star.obsid, star.obi, to_addr=email, mesg=anom_text,
+                                       subject='Acq Anomaly: Obsid %d Obi %d' % (
+                                star.obsid, star.obi))
+                        logger.error(anom_text)
 
 def update_obi(obs, dbh, dryrun=False, email=None):
     obs_db = get_obs_db(obs.obsid, obs.obi, obs.tstart)
     stars, warnings = get_stars(obs_db, obs)
     get_acq_data(obs, stars)
     get_acq_deltas(stars, email)
-    get_gui_data(stars)
+    get_gui_data(stars, email)
     print_debug_table(stars, warnings)
     if not dryrun:
         update_db(stars, warnings, dbh=dbh)
