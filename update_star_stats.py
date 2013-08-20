@@ -19,7 +19,7 @@ import Ska.quatutil
 import Ska.astro
 from scipy.stats import scoreatpercentile
 from Chandra.Time import DateTime
-from agasc import agasc
+import agasc
 from pexpect import ExceptionPexpect
 
 
@@ -392,10 +392,10 @@ def get_stars(obsdb_obs, mp_obs, dbi):
     q_aca = Quat((obs_info['point_ra'],
                   obs_info['point_dec'],
                   obs_info['point_roll']))
-    field_agasc = agasc(ra=obs_info['point_ra'],
-                        dec=obs_info['point_dec'],
-                        radius=1.5,
-                        date=DateTime(obsdb_obs['kalman_tstart']))
+    field_agasc = agasc.get_agasc_cone(ra=obs_info['point_ra'],
+                                       dec=obs_info['point_dec'],
+                                       radius=1.5,
+                                       date=DateTime(obsdb_obs['kalman_tstart']))
 
     # position in catalog
     acq_cat_pos = 0
