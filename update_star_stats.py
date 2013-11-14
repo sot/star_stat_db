@@ -537,8 +537,18 @@ def get_acq_data(mp_obs, stars):
     # min_cmd_time = sqlaca.fetchone(
     # "select min(time) as time from cmds")['time']
     min_cmd_time = DateTime('2002:007:13:38:57.743').secs
+    end_last_manvr_time = None
+    if stars[0].kalman_tstart < mp_obs['tstart']:
+        logger.warn(
+            "Error, for obsid {}, mp_load_info/obidet tstart after kalman_start".format(
+                mp_obs['obsid']))
+        end_last_manvr_time = sqlaca.fetchone(
+            """select max(tstop) as tstop from aiprops
+               where tstart < %f
+               and pcad_mode = 'NMAN'"""
+            % (stars[0].kalman_tstart))['tstop']
     # the kalman_start and such are in all the lines of the stars recarray
-    if stars[0].kalman_tstart > min_cmd_time:
+    if (stars[0].kalman_tstart > min_cmd_time) and not end_last_manvr_time:
         end_last_manvr_time = sqlaca.fetchone(
             """select min(tstart) as tstart from aiprops
                where tstart < %f
@@ -566,6 +576,8 @@ def get_acq_data(mp_obs, stars):
     # the acq time should be sometime between the end of the last
     # maneuver and the beginning of the kalman interval
     pcad_tstart = end_last_manvr_time
+    if pcad_tstart is None:
+        raise ObsidError("could not determine obsid start time")
     pcad_tstop = stars[0].kalman_tstart
 
     acq_fields = [field + '%s' % slot for field in
