@@ -729,8 +729,11 @@ def get_gui_data(stars, email=None):
                                 dtype=bool)
             obc_bad_stat = np.zeros(len(telem[refmsid].times[obsid_match]),
                                     dtype=bool)
-            obc_stat_fields = ['common_col', 'def_pix',
+            obc_stat_fields = ['common_col',
                                'mult_star', 'ion_rad']
+            # if observed before removing the defective pixel from the onboard filtering
+            if pcad_tstart < DateTime('2013:297:11:25:52.000').secs:
+                obc_stat_fields.append('def_pix')
             for imstat in stat_map.keys():
                 slot_imstat = telem[stat_map[imstat] + str(slot)].vals
                 obsid_slot_imstat = slot_imstat[obsid_match]
