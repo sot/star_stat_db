@@ -862,6 +862,27 @@ def anom_email(obsid, obi, to_addr, mesg, subject):
     s.quit()
 
 
+def check_acq_id_count(stars, limit=3, email=None):
+    """
+    For each obsid, count the number of acquired stars and
+    throw a warning if at or under limit.
+
+    :param stars: stars structure from get_acq_stars()
+    :param limit: threshold for warnings
+    :param email: email address for warnings
+    """
+    id_count = np.count_nonzero(stars['obc_id'] == 'ID')
+    if id_count <= limit:
+        anom_text = "Warning: Obsid {} shows only {} identified ACQ stars".format(
+            stars[0]['obsid'], id_count)
+        if email:
+            anom_email(stars[0]['obsid'], stars[0]['obi'], to_addr=email, mesg=anom_text,
+                       subject='Only {} ID\'d acq stars for Obsid {}'.format(
+                    id_count,
+                    stars[0]['obsid']))
+        logger.error(anom_text)
+
+
 def get_acq_deltas(stars, email=None):
     """
     For the obsid, and the stars structure given, calculate
@@ -930,6 +951,7 @@ def update_obi(obs, dbh, dryrun=False, email=None):
     stars, warnings = get_stars(obs_db, obs, dbh.dbi)
     get_acq_data(obs, stars)
     get_acq_deltas(stars, email)
+    check_acq_id_count(stars, email=email)
     get_gui_data(stars, email)
     print_debug_table(stars, warnings)
     if not dryrun:
