@@ -594,9 +594,16 @@ def get_acq_data(mp_obs, stars):
     cobsrqid = telem['COBSRQID']
     cobsid_match = np.flatnonzero(cobsrqid.vals == stars[0].obsid)
     if not len(cobsid_match):
-        raise ObsidError(
-            "obsid %d not found in cobsrqid telem in range"
-            % stars[0].obsid)
+        # If within last 4 days, throw a TooNewError that will be
+        # handled by Skipping instead of Error-ing in the log
+        if ((DateTime().secs - pcad_tstart) < (4 * 86400)):
+            raise TooNewError(
+                "obsid {} not found in cobsrqid telem in range".format(
+                    stars[0].obsid))
+        else:
+            raise ObsidError(
+                "obsid %d not found in cobsrqid telem in range"
+                % stars[0].obsid)
     min_pcad_obsid = cobsrqid.times[min(cobsid_match)]
     max_pcad_obsid = cobsrqid.times[max(cobsid_match)]
     obsid_match = ((aoacaseq.times >= min_pcad_obsid)
@@ -693,8 +700,16 @@ def get_gui_data(stars, email=None):
     cobsrqid = telem['COBSRQID']
     cobsid_match = np.flatnonzero(cobsrqid.vals == stars[0].obsid)
     if not len(cobsid_match):
-        raise ObsidError("obsid %d not found in cobsrqid telem in range"
-                         % stars[0].obsid)
+        # If within last 4 days, throw a TooNewError that will be
+        # handled by Skipping instead of Error-ing in the log
+        if ((DateTime().secs - pcad_tstart) < (4 * 86400)):
+            raise TooNewError(
+                "obsid {} not found in cobsrqid telem in range".format(
+                    stars[0].obsid))
+        else:
+            raise ObsidError(
+                "obsid %d not found in cobsrqid telem in range"
+                % stars[0].obsid)
     min_pcad_obsid = cobsrqid.times[min(cobsid_match)]
     max_pcad_obsid = cobsrqid.times[max(cobsid_match)]
     obsid_match = ((aoacaseq.times >= min_pcad_obsid)
