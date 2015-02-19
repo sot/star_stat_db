@@ -186,7 +186,7 @@ def get_options():
     parser.add_option("--missing-list",
                       default="ok_missing.csv")
     parser.add_option('--email',
-                      default="jeanconn",
+                      default="aca@head.cfa.harvard.edu",
                       help="email warning recipient")
     parser.add_option("-v", "--verbose",
                       type='int',
