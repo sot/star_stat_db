@@ -262,9 +262,9 @@ def get_needed_obsids(requested_obsid=None, missing_set=set()):
                left outer join %s as a
                on mp.obsid = a.obsid
                and mp.obi = a.obi
-               where a.slot is NULL
+               where (a.slot is NULL or a.revision != '%s')
                order by mp.tstart desc"""
-                 % (','.join(fields), data_table['acq']))
+                 % (','.join(fields), data_table['acq'], revision))
         #where a.slot = 4 or a.slot is NULL""" % (','.join(fields))
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
@@ -275,9 +275,9 @@ def get_needed_obsids(requested_obsid=None, missing_set=set()):
                left outer join %s as a
                on mp.obsid = a.obsid
                and mp.obi = a.obi
-               where a.slot is NULL
+               where (a.slot is NULL or a.revision != '%s')
                order by mp.tstart desc"""
-                 % (','.join(fields), data_table['gui']))
+                 % (','.join(fields), data_table['gui'], revision))
         #where a.slot = 4 or a.slot is NULL""" % (','.join(fields))
         # using the slot seems to be the quickest way to just get me one
         # entry per obsid...
