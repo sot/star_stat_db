@@ -722,9 +722,11 @@ def get_gui_data(stars, email=None):
             star['n_samples'] = len(telem[refmsid].times[obsid_match])
             star['not_tracking_samples'] = len(np.flatnonzero(
                 telem['AOACFCT' + str(slot)].vals[obsid_match] != 'TRAK'))
-
+            tracking = telem['AOACFCT' + str(slot)].vals == 'TRAK'
             for par in ['AOACMAG', 'AOACYAN', 'AOACZAN']:
-                stat_telem = telem[par + str(slot)].vals[obsid_match]
+                stat_telem = telem[par + str(slot)].vals[obsid_match & tracking]
+                if not len(stat_telem):
+                    continue
                 star[par.lower() + '_min'] = np.min(stat_telem)
                 star[par.lower() + '_max'] = np.max(stat_telem)
                 star[par.lower() + '_mean'] = np.mean(stat_telem)
