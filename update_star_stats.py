@@ -250,6 +250,7 @@ def get_needed_obsids(requested_obsid=None, missing_set=set()):
               'mp.tstart', 'mp.tstop', 'mp.mp_path',
               'mp.last_ap_date', 'mp.no_starcheck', 'mp.wrong_starcheck']
     if (requested_obsid):
+        logger.debug("Querying obs info for {}".format(requested_obsid))
         query = """SELECT %s from mp_load_info as mp where obsid = %d""" % (
             ','.join(fields), requested_obsid)
         obsdata = sqlaca.fetchall(query)
@@ -258,6 +259,7 @@ def get_needed_obsids(requested_obsid=None, missing_set=set()):
                 "get_needed_obsids(): no record of %d in mp_load_info table"
                 % requested_obsid)
     else:
+        logger.debug("Running db query to get full set of to-be-updated obsids")
         acq_q = ("""select %s, a.slot from mp_load_info as mp
                left outer join %s as a
                on mp.obsid = a.obsid
