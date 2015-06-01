@@ -849,6 +849,8 @@ def update_db(stars, warnings, dbh):
                                     obi=acq['obi'],
                                     slot=acq['slot'],
                                     details=warn), warning_table['acq'])
+            if acq['agasc_id'] is None:
+                continue
             dbh.insert(acq, data_table['acq'])
         logger.debug("acq inserts complete")
     trak = stars[(stars['type'] == 'FID')
