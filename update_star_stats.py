@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 import numpy as np
 import Ska.DBI
 import Ska.Table
+from astropy.table import Table
 import Ska.Numpy
 import Ska.engarchive.fetch as fetch
 import Ska.quatutil
@@ -833,8 +834,8 @@ def update_db(stars, warnings, dbh):
     Delete guide stats entries for the given obsid and insert the new entries.
     """
 
-    acqs = stars[(stars['type'] == 'BOT')
-                 | (stars['type'] == 'ACQ')][acq_cols]
+    acqs = Table(stars[(stars['type'] == 'BOT')
+                 | (stars['type'] == 'ACQ')])[acq_cols]
     if len(acqs):
         dbh.execute("delete from %s where obsid = %d and obi = %d"
                     % (data_table['acq'], acqs[0]['obsid'], acqs[0]['obi']))
@@ -853,9 +854,9 @@ def update_db(stars, warnings, dbh):
                 continue
             dbh.insert(acq, data_table['acq'])
         logger.debug("acq inserts complete")
-    trak = stars[(stars['type'] == 'FID')
+    trak = Table(stars[(stars['type'] == 'FID')
                  | (stars['type'] == 'GUI')
-                 | (stars['type'] == 'BOT')][gui_cols]
+                 | (stars['type'] == 'BOT')])[gui_cols]
     if len(trak):
         dbh.execute("delete from %s where obsid = %d and obi = %d"
                     % (data_table['gui'], trak[0]['obsid'], trak[0]['obi']))
