@@ -6,7 +6,6 @@ import os
 import logging
 import logging.handlers
 import time
-import mx.DateTime
 import smtplib
 from email.mime.text import MIMEText
 
@@ -221,8 +220,7 @@ def get_obs_db(obsid, obi, tstart):
             raise WeirdObsidError(
                 "In observations_all but not observations table; no kalman")
         # bigger warning if this is old data and not in observations table
-        minus7 = (DateTime(DateTime().mxDateTime
-                           - mx.DateTime.DateTimeDeltaFromDays(7)))
+        minus7 = DateTime() - 7
         if (tstart >= minus7.secs):
             raise TooNewError("Not yet in observations table")
         else:
