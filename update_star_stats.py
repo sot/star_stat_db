@@ -32,6 +32,7 @@ sqlocc = Ska.DBI.DBI(dbi='sybase', server='sqlocc', user='aca_ops',
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
+DEFAULT_EMAIL_RECIP = ['aca@head.cfa.harvard.edu', 'emartin@ipa.harvard.edu']
 ID_DIST_LIMIT = 1.5
 acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
@@ -186,8 +187,12 @@ def get_options():
     parser.add_option("--missing-list",
                       default="ok_missing.csv")
     parser.add_option('--email',
-                      default="aca@head.cfa.harvard.edu",
-                      help="email warning recipient")
+                      action="append",
+                      help="email warning recipient, specify multiple times "
+                      + "for multiple recipients")
+    parser.add_option('--no-email',
+                      action="store_true",
+                      help="disable email notifications")
     parser.add_option("-v", "--verbose",
                       type='int',
                       default=1,
@@ -876,9 +881,9 @@ def anom_email(obsid, obi, to_addr, mesg, subject):
     msg = MIMEText(mesg)
     msg['From'] = 'aca@head.cfa.harvard.edu'
     msg['Subject'] = subject
-    msg['To'] = to_addr
+    msg['To'] = ",".join(to_addr)
     s = smtplib.SMTP('head.cfa.harvard.edu')
-    s.sendmail('aca@head.cfa.harvard.edu', [to_addr], msg.as_string())
+    s.sendmail('aca@head.cfa.harvard.edu', to_addr, msg.as_string())
     s.quit()
 
 
@@ -981,7 +986,8 @@ def update_obi(obs, dbh, dryrun=False, email=None):
 def main():
 
     (opt,args) = get_options()
-
+    if opt.email is None and not opt.no_email:
+        opt.email = DEFAULT_EMAIL_RECIP
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     if opt.verbose == 2:
