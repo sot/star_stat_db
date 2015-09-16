@@ -32,7 +32,7 @@ sqlocc = Ska.DBI.DBI(dbi='sybase', server='sqlocc', user='aca_ops',
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-DEFAULT_EMAIL_RECIP = ['aca@head.cfa.harvard.edu', 'emartin@ipa.harvard.edu']
+DEFAULT_EMAIL_RECIP = ['aca_alert@cfa.harvard.edu']
 ID_DIST_LIMIT = 1.5
 acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
