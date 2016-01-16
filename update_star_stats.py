@@ -782,9 +782,10 @@ def get_gui_data(stars, email=None):
                         + "OBSID %d OBI %d " % (star.obsid, star.obi)
                         + " not tracking fraction = %.2f" % nt_frac)
                     logger.error(warn)
-                    anom_email(star.obsid, star.obi, to_addr=email, mesg=warn,
-                               subject='FID Trak < 95%%: Obsid %d Obi %d' % (
-                            star.obsid, star.obi))
+                    if email:
+                        anom_email(star.obsid, star.obi, to_addr=email, mesg=warn,
+                                   subject='FID Trak < 95%%: Obsid %d Obi %d' % (
+                                star.obsid, star.obi))
 
 
 def print_debug_table(stars, warnings):
