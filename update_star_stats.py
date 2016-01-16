@@ -36,7 +36,7 @@ DEFAULT_EMAIL_RECIP = ['aca_alert@cfa.harvard.edu']
 ID_DIST_LIMIT = 1.5
 acq_anom_radius = 160
 mp_path = '/data/mpcrit1/mplogs'
-revision = '3.4'
+revision = '3.5'
 
 data_table = {'gui': 'trak_stats_data',
               'acq': 'acq_stats_data'}
